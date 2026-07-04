@@ -66,6 +66,7 @@ window.addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (gameState !== 'play') return;
   if (e.code === 'Space') { e.preventDefault(); queuedRoll = true; }
+  if (e.code.startsWith('Arrow')) e.preventDefault();
   if (e.code === 'KeyF') queuedDrink = true;
   if (e.code === 'KeyE') queuedInteract = true;
   if (e.code === 'KeyQ') toggleLockOn();
@@ -79,11 +80,27 @@ document.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement === canvas) {
     mouseDX += e.movementX;
     mouseDY += e.movementY;
+  } else if (pointerLockBroken && gameState === 'play') {
+    mouseDX += e.movementX * 0.55;
+    mouseDY += e.movementY * 0.55;
   }
 });
+// Pointer lock can be unavailable inside sandboxed iframes (e.g. hosted
+// previews). When it fails we fall back to arrow-key / drag camera control
+// and let clicks attack directly.
+let pointerLockBroken = false;
+function tryPointerLock() {
+  try {
+    const p = canvas.requestPointerLock();
+    if (p && p.catch) p.catch(() => { pointerLockBroken = true; });
+    setTimeout(() => { if (document.pointerLockElement !== canvas) pointerLockBroken = true; }, 800);
+  } catch (_) {
+    pointerLockBroken = true;
+  }
+}
 canvas.addEventListener('mousedown', (e) => {
   if (gameState !== 'play') return;
-  if (document.pointerLockElement !== canvas) { canvas.requestPointerLock(); return; }
+  if (document.pointerLockElement !== canvas && !pointerLockBroken) { tryPointerLock(); return; }
   if (e.button === 0) queuedLight = true;
   if (e.button === 2) queuedHeavy = true;
 });
@@ -255,7 +272,7 @@ function respawn() {
   gameState = 'play';
   ui.hideScreens();
   ui.showHUD(true);
-  canvas.requestPointerLock();
+  tryPointerLock();
 }
 
 // ---------- checkpoint / interact ----------
@@ -327,6 +344,13 @@ function updateCamera(dt) {
   camPitch = Math.min(1.1, Math.max(-0.35, camPitch + mouseDY * sens));
   mouseDX = 0; mouseDY = 0;
 
+  // arrow-key camera (fallback when pointer lock is unavailable)
+  const rot = 2.6 * dt;
+  if (keys['ArrowLeft']) camYaw += rot;
+  if (keys['ArrowRight']) camYaw -= rot;
+  if (keys['ArrowUp']) camPitch = Math.max(-0.35, camPitch - rot * 0.55);
+  if (keys['ArrowDown']) camPitch = Math.min(1.1, camPitch + rot * 0.55);
+
   if (lockTarget && !lockTarget.dead) {
     // bias camera toward keeping the target framed
     const to = lockTarget.pos.clone().sub(player.pos);
@@ -374,7 +398,7 @@ function updateHUD() {
     if (cp) ui.setPrompt(`<b>E</b> — พักที่ ${cp.name} (ฟื้นพลัง / เซฟเกม)`);
     else if (codeDrop && codeDrop.mesh.position.clone().setY(0).distanceTo(player.pos) < 2.2)
       ui.setPrompt(`<b>E</b> — เก็บ ${codeDrop.amount.toLocaleString()} LINES OF CODE คืน`);
-    else if (document.pointerLockElement !== canvas)
+    else if (document.pointerLockElement !== canvas && !pointerLockBroken)
       ui.setPrompt('คลิกที่หน้าจอเพื่อควบคุมตัวละคร');
     else ui.setPrompt('');
   } else ui.setPrompt('');
@@ -523,7 +547,7 @@ document.getElementById('btn-start').addEventListener('click', () => {
   ui.hideScreens();
   ui.showHUD(true);
   camYaw = 0; camPitch = 0.32;
-  canvas.requestPointerLock();
+  tryPointerLock();
   ui.toast('หนีให้พ้นเดดไลน์… และอย่าโดนไล่ออก', 3200);
 });
 document.getElementById('btn-respawn').addEventListener('click', respawn);
