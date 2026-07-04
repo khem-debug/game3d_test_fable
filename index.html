@@ -20,7 +20,7 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: var(--gray-900); }
   body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; color: var(--white); }
-  #game-canvas { display: block; width: 100%; height: 100%; }
+  #game-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
   /* ---------- HUD ---------- */
   #hud { position: fixed; inset: 0; pointer-events: none; user-select: none; }
@@ -120,6 +120,32 @@
   #screen-win h1 { color: var(--orange-bright); }
 
   #loading { position: fixed; inset: 0; background: var(--gray-900); z-index: 20; display: flex; align-items: center; justify-content: center; color: var(--gray-500); letter-spacing: 4px; font-family: 'Consolas', monospace; }
+
+  /* ---------- touch controls (shown on touch devices) ---------- */
+  #touch-ui .tbtn, #joy-base { pointer-events: auto; }
+  #joy-base {
+    position: absolute; bottom: 96px; left: 30px; width: 128px; height: 128px;
+    border: 1px solid rgba(245,246,247,.28); border-radius: 50%;
+    background: rgba(31,35,41,.45); touch-action: none;
+  }
+  #joy-knob {
+    position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px;
+    border-radius: 50%; background: rgba(249,115,22,.5); border: 1px solid var(--orange-bright);
+  }
+  #touch-btns {
+    position: absolute; bottom: 86px; right: 20px;
+    display: grid; grid-template-columns: repeat(3, 62px); gap: 10px;
+  }
+  .tbtn {
+    width: 62px; height: 62px; border-radius: 50%;
+    background: rgba(31,35,41,.6); border: 1px solid var(--gray-500);
+    color: var(--white); font-size: 22px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .tbtn small { font-size: 9px; letter-spacing: 1px; }
+  .tbtn.orange { border-color: var(--orange); color: var(--orange-bright); background: rgba(249,115,22,.16); }
+  .tbtn:active { background: rgba(249,115,22,.4); }
 </style>
 </head>
 <body>
@@ -145,6 +171,17 @@
   <div id="prompt" class="hidden"></div>
   <div id="lock-marker" class="hidden"></div>
   <div id="toast"></div>
+  <div id="touch-ui" class="hidden">
+    <div id="joy-base"><div id="joy-knob"></div></div>
+    <div id="touch-btns">
+      <div class="tbtn" id="tb-lock">🎯</div>
+      <div class="tbtn orange" id="tb-heavy">💥</div>
+      <div class="tbtn orange" id="tb-light">⚔️</div>
+      <div class="tbtn" id="tb-coffee">☕</div>
+      <div class="tbtn" id="tb-use">E</div>
+      <div class="tbtn" id="tb-roll">🌀</div>
+    </div>
+  </div>
 </div>
 
 <div id="screen-title" class="screen">
@@ -159,7 +196,8 @@
   <button class="btn" id="btn-start">START — กดเพื่อเริ่มเกม</button>
   <div class="controls-hint">
     <b>WASD</b> เดิน &nbsp;·&nbsp; <b>เมาส์ / ปุ่มลูกศร</b> หมุนกล้อง &nbsp;·&nbsp; <b>SHIFT</b> วิ่ง &nbsp;·&nbsp; <b>SPACE</b> กลิ้งหลบ (มี i-frames)<br>
-    <b>คลิกซ้าย</b> ฟันเบา &nbsp;·&nbsp; <b>คลิกขวา</b> ฟันหนัก &nbsp;·&nbsp; <b>Q</b> ล็อกเป้า &nbsp;·&nbsp; <b>F</b> ดื่มกาแฟ (ฟื้นเลือด) &nbsp;·&nbsp; <b>E</b> ใช้งาน / พักที่ Deploy Server
+    <b>คลิกซ้าย</b> ฟันเบา &nbsp;·&nbsp; <b>คลิกขวา</b> ฟันหนัก &nbsp;·&nbsp; <b>Q</b> ล็อกเป้า &nbsp;·&nbsp; <b>F</b> ดื่มกาแฟ (ฟื้นเลือด) &nbsp;·&nbsp; <b>E</b> ใช้งาน / พักที่ Deploy Server<br>
+    <b>มือถือ</b>: จอยสติ๊กซ้ายเดิน (ดันสุด = วิ่ง) · ลากนิ้วบนจอหมุนกล้อง · ปุ่มขวา ⚔️ โจมตี 🌀 กลิ้ง 🎯 ล็อกเป้า
   </div>
 </div>
 

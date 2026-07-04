@@ -106,6 +106,77 @@ canvas.addEventListener('mousedown', (e) => {
 });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
+// ---------- touch controls ----------
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+const joy = { x: 0, y: 0, active: false };
+if (isTouch) {
+  document.getElementById('touch-ui').classList.remove('hidden');
+  const base = document.getElementById('joy-base');
+  const knob = document.getElementById('joy-knob');
+  let joyId = null;
+  const handleJoy = (t) => {
+    const r = base.getBoundingClientRect();
+    let dx = t.clientX - (r.left + r.width / 2);
+    let dy = t.clientY - (r.top + r.height / 2);
+    const max = r.width / 2 - 10;
+    const len = Math.hypot(dx, dy);
+    if (len > max) { dx = dx / len * max; dy = dy / len * max; }
+    joy.x = dx / max; joy.y = dy / max;
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+  };
+  base.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    joyId = e.changedTouches[0].identifier;
+    joy.active = true;
+    handleJoy(e.changedTouches[0]);
+  }, { passive: false });
+  base.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    for (const t of e.changedTouches) if (t.identifier === joyId) handleJoy(t);
+  }, { passive: false });
+  const joyEnd = (e) => {
+    for (const t of e.changedTouches) if (t.identifier === joyId) {
+      joyId = null; joy.active = false; joy.x = joy.y = 0;
+      knob.style.transform = 'translate(0px, 0px)';
+    }
+  };
+  base.addEventListener('touchend', joyEnd);
+  base.addEventListener('touchcancel', joyEnd);
+
+  // drag anywhere on the canvas to orbit the camera
+  let camId = null, lastX = 0, lastY = 0;
+  canvas.addEventListener('touchstart', (e) => {
+    if (camId === null) {
+      const t = e.changedTouches[0];
+      camId = t.identifier; lastX = t.clientX; lastY = t.clientY;
+    }
+  }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => {
+    for (const t of e.changedTouches) if (t.identifier === camId) {
+      e.preventDefault();
+      mouseDX += (t.clientX - lastX) * 1.7;
+      mouseDY += (t.clientY - lastY) * 1.7;
+      lastX = t.clientX; lastY = t.clientY;
+    }
+  }, { passive: false });
+  const camEnd = (e) => { for (const t of e.changedTouches) if (t.identifier === camId) camId = null; };
+  canvas.addEventListener('touchend', camEnd);
+  canvas.addEventListener('touchcancel', camEnd);
+
+  const bindBtn = (id, fn) => {
+    document.getElementById(id).addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (gameState === 'play') fn();
+    }, { passive: false });
+  };
+  bindBtn('tb-light', () => { queuedLight = true; });
+  bindBtn('tb-heavy', () => { queuedHeavy = true; });
+  bindBtn('tb-roll', () => { queuedRoll = true; });
+  bindBtn('tb-coffee', () => { queuedDrink = true; });
+  bindBtn('tb-use', () => { queuedInteract = true; });
+  bindBtn('tb-lock', () => { toggleLockOn(); });
+}
+
 function toggleLockOn() {
   if (lockTarget && !lockTarget.dead) { lockTarget = null; return; }
   let best = null, bestD = 26;
@@ -442,8 +513,9 @@ function tick() {
   if (gameState === 'play' || gameState === 'dead' || gameState === 'win') {
     // --- player input ---
     if (gameState === 'play' && player.alive) {
-      const ix = (keys['KeyD'] ? 1 : 0) - (keys['KeyA'] ? 1 : 0);
-      const iz = (keys['KeyS'] ? 1 : 0) - (keys['KeyW'] ? 1 : 0);
+      let ix = (keys['KeyD'] ? 1 : 0) - (keys['KeyA'] ? 1 : 0);
+      let iz = (keys['KeyS'] ? 1 : 0) - (keys['KeyW'] ? 1 : 0);
+      if (joy.active) { ix = joy.x; iz = joy.y; }
       const fwd = new THREE.Vector3(-Math.sin(camYaw), 0, -Math.cos(camYaw));
       const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
       const moveDir = new THREE.Vector3()
@@ -471,7 +543,9 @@ function tick() {
           codeDrop = null;
         }
       }
-      player.update(dt, { moveDir, sprint: keys['ShiftLeft'] || keys['ShiftRight'], lockDir }, world);
+      const sprint = keys['ShiftLeft'] || keys['ShiftRight']
+        || (joy.active && Math.hypot(joy.x, joy.y) > 0.95); // full stick deflection = sprint
+      player.update(dt, { moveDir, sprint, lockDir }, world);
       resolvePlayerAttack();
     } else {
       player.update(dt, { moveDir: new THREE.Vector3(), sprint: false, lockDir: null }, world);
