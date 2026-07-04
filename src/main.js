@@ -7,10 +7,12 @@ import { UI } from './ui.js';
 import { SFX } from './audio.js';
 
 // ---------- renderer / scene ----------
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 const canvas = document.getElementById('game-canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// lower pixel ratio on phones keeps the frame rate up
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouch ? 1.5 : 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -107,7 +109,6 @@ canvas.addEventListener('mousedown', (e) => {
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ---------- touch controls ----------
-const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 const joy = { x: 0, y: 0, active: false };
 if (isTouch) {
   document.getElementById('touch-ui').classList.remove('hidden');
@@ -617,6 +618,16 @@ function tick() {
 // ---------- screen buttons ----------
 document.getElementById('btn-start').addEventListener('click', () => {
   sfx.ensure();
+  if (isTouch) {
+    // best-effort fullscreen + landscape on phones; ignore if the host blocks it
+    try {
+      const fs = document.documentElement.requestFullscreen?.();
+      if (fs && fs.then) {
+        fs.then(() => screen.orientation?.lock?.('landscape')?.catch(() => {}))
+          .catch(() => {});
+      }
+    } catch (_) { /* not available */ }
+  }
   gameState = 'play';
   ui.hideScreens();
   ui.showHUD(true);

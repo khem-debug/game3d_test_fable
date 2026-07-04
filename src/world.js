@@ -104,7 +104,8 @@ export function buildWorld(scene) {
   const dir = new THREE.DirectionalLight(0xd8dce2, 1.1);
   dir.position.set(18, 30, 12);
   dir.castShadow = true;
-  dir.shadow.mapSize.set(2048, 2048);
+  const coarse = window.matchMedia?.('(pointer: coarse)').matches;
+  dir.shadow.mapSize.set(coarse ? 1024 : 2048, coarse ? 1024 : 2048);
   dir.shadow.camera.left = -70; dir.shadow.camera.right = 70;
   dir.shadow.camera.top = 70; dir.shadow.camera.bottom = -70;
   dir.shadow.camera.far = 120;
