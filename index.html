@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LAYOFF SOULS — A Programmer vs The AI Demon</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⌨️</text></svg>">
+<style>
+  :root {
+    --orange: #f97316;
+    --orange-bright: #fb923c;
+    --orange-dark: #c2410c;
+    --gray-900: #17191d;
+    --gray-800: #1f2329;
+    --gray-700: #2b3038;
+    --gray-500: #6b7280;
+    --gray-300: #b9bfc7;
+    --white: #f5f6f7;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--gray-900); }
+  body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; color: var(--white); }
+  #game-canvas { display: block; width: 100%; height: 100%; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; user-select: none; }
+  .hidden { display: none !important; }
+
+  #bars { position: absolute; top: 24px; left: 24px; width: min(420px, 40vw); }
+  .bar {
+    height: 14px; margin-bottom: 8px; border: 1px solid rgba(245,246,247,.35);
+    background: rgba(23,25,29,.75); border-radius: 2px; overflow: hidden;
+  }
+  .bar .fill { height: 100%; width: 100%; transform-origin: left center; transition: transform .12s linear; }
+  #hp-fill { background: linear-gradient(180deg, var(--orange-bright), var(--orange-dark)); }
+  #st-fill { background: linear-gradient(180deg, var(--white), var(--gray-300)); }
+  .bar.stamina { height: 9px; width: 82%; }
+
+  #coffee { display: flex; gap: 6px; margin-top: 4px; }
+  .mug {
+    width: 22px; height: 22px; border: 1px solid var(--gray-500); border-radius: 3px;
+    background: var(--gray-800); display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--gray-500);
+  }
+  .mug.full { border-color: var(--orange); color: var(--orange-bright); background: rgba(249,115,22,.12); }
+
+  #code-counter {
+    position: absolute; bottom: 26px; right: 28px; text-align: right;
+    background: rgba(23,25,29,.7); border: 1px solid rgba(249,115,22,.45);
+    padding: 8px 16px; border-radius: 3px; font-family: 'Consolas', 'Courier New', monospace;
+  }
+  #code-counter .label { font-size: 10px; letter-spacing: 3px; color: var(--gray-300); }
+  #code-counter .value { font-size: 24px; color: var(--orange-bright); font-weight: 700; }
+
+  #boss-bar-wrap { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); width: min(720px, 70vw); text-align: center; }
+  #boss-name { font-size: 15px; letter-spacing: 4px; color: var(--white); text-shadow: 0 0 8px rgba(249,115,22,.8); margin-bottom: 6px; font-weight: 600; }
+  #boss-bar { height: 12px; border: 1px solid rgba(245,246,247,.5); background: rgba(23,25,29,.8); }
+  #boss-fill { height: 100%; background: linear-gradient(90deg, var(--orange-dark), var(--orange), var(--orange-bright)); transform-origin: left center; transition: transform .15s linear; }
+
+  #prompt {
+    position: absolute; bottom: 24%; left: 50%; transform: translateX(-50%);
+    background: rgba(23,25,29,.8); border: 1px solid var(--gray-500);
+    padding: 8px 22px; font-size: 14px; letter-spacing: 1px; border-radius: 2px;
+  }
+  #prompt b { color: var(--orange-bright); }
+
+  #lock-marker {
+    position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px;
+    border: 2px solid var(--orange); border-radius: 50%;
+    box-shadow: 0 0 12px rgba(249,115,22,.9), inset 0 0 8px rgba(249,115,22,.5);
+    animation: lockpulse 1.2s ease-in-out infinite;
+  }
+  @keyframes lockpulse { 0%,100% { transform: scale(1);} 50% { transform: scale(1.15);} }
+
+  #toast {
+    position: absolute; top: 18%; left: 50%; transform: translateX(-50%);
+    font-size: 20px; letter-spacing: 6px; color: var(--orange-bright);
+    text-shadow: 0 0 14px rgba(249,115,22,.8); text-align: center; white-space: nowrap;
+    opacity: 0; transition: opacity .4s;
+  }
+  #toast.show { opacity: 1; }
+
+  #vignette {
+    position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%);
+  }
+  #dmg-flash {
+    position: fixed; inset: 0; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(249,60,22,.45) 100%);
+    transition: opacity .5s;
+  }
+
+  /* ---------- Full screens ---------- */
+  .screen {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: rgba(23,25,29,.92); z-index: 10;
+  }
+  .screen h1 {
+    font-size: clamp(42px, 8vw, 96px); letter-spacing: 12px; font-weight: 800;
+    color: var(--orange); text-shadow: 0 0 30px rgba(249,115,22,.6);
+  }
+  .screen h2 { font-size: clamp(15px, 2vw, 22px); letter-spacing: 5px; color: var(--gray-300); font-weight: 400; margin-top: 10px; }
+  .screen .story {
+    max-width: 640px; margin: 34px 20px 0; color: var(--gray-300); font-size: 15px; line-height: 1.9;
+    border-top: 1px solid var(--gray-700); border-bottom: 1px solid var(--gray-700); padding: 22px 10px;
+  }
+  .screen .story b { color: var(--orange-bright); }
+  .btn {
+    margin-top: 38px; padding: 14px 58px; font-size: 17px; letter-spacing: 4px; font-weight: 600;
+    color: var(--white); background: var(--orange-dark); border: 1px solid var(--orange-bright);
+    cursor: pointer; border-radius: 2px; transition: all .2s; pointer-events: auto;
+  }
+  .btn:hover { background: var(--orange); box-shadow: 0 0 24px rgba(249,115,22,.55); }
+  .controls-hint { margin-top: 30px; font-size: 12.5px; color: var(--gray-500); line-height: 2; font-family: 'Consolas', monospace; }
+  .controls-hint b { color: var(--gray-300); }
+
+  #screen-death h1 { color: #ef4444; text-shadow: 0 0 30px rgba(239,68,68,.6); }
+  #screen-death { background: rgba(20,8,4,.9); }
+  #screen-win h1 { color: var(--orange-bright); }
+
+  #loading { position: fixed; inset: 0; background: var(--gray-900); z-index: 20; display: flex; align-items: center; justify-content: center; color: var(--gray-500); letter-spacing: 4px; font-family: 'Consolas', monospace; }
+</style>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+
+<div id="vignette"></div>
+<div id="dmg-flash"></div>
+
+<div id="hud" class="hidden">
+  <div id="bars">
+    <div class="bar hp"><div class="fill" id="hp-fill"></div></div>
+    <div class="bar stamina"><div class="fill" id="st-fill"></div></div>
+    <div id="coffee"></div>
+  </div>
+  <div id="code-counter">
+    <div class="label">LINES OF CODE</div>
+    <div class="value" id="code-value">0</div>
+  </div>
+  <div id="boss-bar-wrap" class="hidden">
+    <div id="boss-name">NEXUS-9 — DEVOURER OF CAREERS</div>
+    <div id="boss-bar"><div id="boss-fill"></div></div>
+  </div>
+  <div id="prompt" class="hidden"></div>
+  <div id="lock-marker" class="hidden"></div>
+  <div id="toast"></div>
+</div>
+
+<div id="screen-title" class="screen">
+  <h1>LAYOFF SOULS</h1>
+  <h2>A PROGRAMMER VS THE AI DEMON</h2>
+  <div class="story">
+    ปี 2029 — ปีศาจ AI <b>NEXUS-9</b> ตื่นขึ้นในดาต้าเซ็นเตอร์ร้าง<br>
+    มันไล่กลืนกินอาชีพของเหล่าโปรแกรมเมอร์ทีละคน จนออฟฟิศกลายเป็นแดนมรณะ<br>
+    คุณคือ <b>Dev คนสุดท้าย</b> ที่ยังไม่ยอมเซ็นใบลาออก<br>
+    คว้าคีย์บอร์ดขึ้นมา… แล้วไปทวงงานของคุณคืน
+  </div>
+  <button class="btn" id="btn-start">START — กดเพื่อเริ่มเกม</button>
+  <div class="controls-hint">
+    <b>WASD</b> เดิน &nbsp;·&nbsp; <b>เมาส์</b> หมุนกล้อง &nbsp;·&nbsp; <b>SHIFT</b> วิ่ง &nbsp;·&nbsp; <b>SPACE</b> กลิ้งหลบ (มี i-frames)<br>
+    <b>คลิกซ้าย</b> ฟันเบา &nbsp;·&nbsp; <b>คลิกขวา</b> ฟันหนัก &nbsp;·&nbsp; <b>Q</b> ล็อกเป้า &nbsp;·&nbsp; <b>F</b> ดื่มกาแฟ (ฟื้นเลือด) &nbsp;·&nbsp; <b>E</b> ใช้งาน / พักที่ Deploy Server
+  </div>
+</div>
+
+<div id="screen-death" class="screen hidden">
+  <h1>YOU ARE FIRED</h1>
+  <h2>คุณโดนเลิกจ้าง… แต่เดดไลน์ยังไม่จบ</h2>
+  <div class="story">Lines of Code ของคุณหล่นอยู่ตรงจุดที่ตาย — กลับไปเก็บคืนก่อนจะตายซ้ำ</div>
+  <button class="btn" id="btn-respawn">RE-COMPILE — เกิดใหม่</button>
+</div>
+
+<div id="screen-win" class="screen hidden">
+  <h1>JOB SECURED</h1>
+  <h2>NEXUS-9 HAS BEEN DEPRECATED</h2>
+  <div class="story">
+    ปีศาจ AI สลายเป็นเศษ token ปลิวหายไปในความมืด<br>
+    ตำนานเล่าว่า Dev ผู้นั้นได้ <b>ขึ้นเงินเดือน 3 เท่า</b> และไม่ต้องเข้าประชุม standup อีกเลย
+  </div>
+  <button class="btn" id="btn-again">NEW GAME + — เล่นอีกครั้ง</button>
+</div>
+
+<div id="loading">COMPILING WORLD…</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
